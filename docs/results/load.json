@@ -1,0 +1,23 @@
+{
+  "timestamp_utc": "2026-10-17T08:21:36.954421+00:00",
+  "environment": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.41",
+  "requests": 10000,
+  "concurrency": 100,
+  "event_id": "323c5d7a-d725-4480-94b0-13af508051c1",
+  "duration_seconds": 110.837,
+  "requests_per_second": 90.22,
+  "status_counts": {
+    "201": 500,
+    "202": 9500
+  },
+  "latency_ms": {
+    "p50": 975.0,
+    "p95": 1873.13,
+    "p99": 2288.6
+  },
+  "active_reservations": 500,
+  "distinct_occupied_seats": 500,
+  "waiting": 9500,
+  "errors": [],
+  "passed": true
+}

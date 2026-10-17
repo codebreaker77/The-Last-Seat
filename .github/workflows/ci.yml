@@ -1,0 +1,28 @@
+name: Backend verification
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Generate ephemeral credentials
+        run: python3 scripts/setup.py
+      - name: Build and deploy stack
+        run: docker compose up --build -d --wait --wait-timeout 180
+      - name: Real service integration tests
+        run: docker compose --profile tools run --rm test
+      - name: Booking load and database invariants
+        run: docker compose --profile tools run --rm load python scripts/load.py --requests 1000 --concurrency 50
+      - name: Outage and restart recovery
+        run: python3 scripts/resilience.py
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=150
+      - name: Stop services
+        if: always()
+        run: docker compose down

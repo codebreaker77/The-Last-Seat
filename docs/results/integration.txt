@@ -1,0 +1,4 @@
+Command: docker compose --profile tools run --rm test
+Environment: real Docker Compose PostgreSQL 17, Redis 7, RabbitMQ 4, Nginx 1.28, Python 3.12
+.............                                                            [100%]
+13 passed in 19.37s

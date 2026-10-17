@@ -1,0 +1,6 @@
+{
+  "redis_fallback": true,
+  "broker_outage_job_durable": true,
+  "broker_recovery_confirms": true,
+  "confirmation_survives_worker_restart": true
+}

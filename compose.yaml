@@ -1,0 +1,91 @@
+name: last-seat
+x-app: &app
+  image: last-seat:local
+  environment: &env
+    DATABASE_URL: postgresql://seat:${POSTGRES_PASSWORD:?Run scripts/setup.py first}@postgres:5432/seat
+    REDIS_URL: redis://redis:6379/0
+    RABBITMQ_URL: amqp://seat:${RABBITMQ_PASSWORD:?Run scripts/setup.py first}@rabbitmq:5672/%2F
+    ADMIN_KEY: ${ADMIN_KEY:?Run scripts/setup.py first}
+  restart: unless-stopped
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+    rabbitmq: {condition: service_healthy}
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: seat
+      POSTGRES_DB: seat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/setup.py first}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U seat -d seat']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --maxmemory, 64mb, --maxmemory-policy, allkeys-lru]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: seat
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Run scripts/setup.py first}
+    volumes: [rabbit-data:/var/lib/rabbitmq]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  api:
+    <<: *app
+    build: .
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  worker:
+    <<: *app
+    command: [python, -m, app.worker]
+  proxy:
+    image: nginx:1.28-alpine
+    ports: ["${BIND_ADDRESS:-127.0.0.1}:${PORT:-18080}:80"]
+    volumes: [./deploy/nginx.conf:/etc/nginx/nginx.conf:ro]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+  test:
+    <<: *app
+    profiles: [tools]
+    restart: "no"
+    environment:
+      <<: *env
+      BASE_URL: http://proxy
+    depends_on:
+      proxy: {condition: service_started}
+    command: [pytest, -q, tests]
+  load:
+    <<: *app
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    profiles: [tools]
+    restart: "no"
+    environment:
+      <<: *env
+      BASE_URL: http://proxy
+    volumes: [./docs/results:/srv/results]
+    depends_on:
+      proxy: {condition: service_started}
+    command: [python, scripts/load.py, --requests, "10000", --concurrency, "100", --output, /srv/results/load.json]
+volumes:
+  postgres-data:
+  rabbit-data:
